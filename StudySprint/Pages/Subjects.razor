@@ -1,0 +1,257 @@
+﻿@page "/subjects"
+
+@inject AppSession Session
+@inject SupabaseService Supabase
+
+<PageTitle>Subjects | StudySprint</PageTitle>
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">ORGANIZE</p>
+
+        <h1>Subjects</h1>
+
+        <p>
+            Add the subjects or courses that
+            you need to study.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            You must
+            <a href="login">sign in</a>
+            before managing subjects.
+        </div>
+    }
+    else
+    {
+        <div class="subject-form">
+            <label for="subjectName">
+                Subject Name
+            </label>
+
+            <input id="subjectName"
+                   class="form-control"
+                   maxlength="80"
+                   placeholder="Example: Calculus"
+                   @bind="_subjectName"
+                   @bind:event="oninput" />
+
+            @if (!string.IsNullOrWhiteSpace(
+                _message))
+            {
+                <p class="@_messageClass">
+                    @_message
+                </p>
+            }
+
+            <button type="button"
+                    class="primary-button"
+                    disabled="@_isWorking"
+                    @onclick="AddSubject">
+                Add Subject
+            </button>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <h2>Your Subjects</h2>
+
+        @if (_isLoading)
+        {
+            <p>Loading subjects...</p>
+        }
+        else if (_subjects.Count == 0)
+        {
+            <div class="empty-state">
+                No subjects have been added yet.
+            </div>
+        }
+        else
+        {
+            <div class="subject-list">
+                @foreach (var subject
+                    in _subjects)
+                {
+                    <div class="subject-row">
+                        <div>
+                            <strong>
+                                @subject.Name
+                            </strong>
+
+                            <div class="small-text">
+                                Added
+                                @subject.CreatedAt
+                                .ToLocalTime()
+                                .ToString("MMM d, yyyy")
+                            </div>
+                        </div>
+
+                        <button type="button"
+                                class="danger-button"
+                                @onclick="() =>
+                                                                DeleteSubject(
+                                                                    subject.Id)">
+Delete
+</button>
+                    </div>
+                }
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private readonly List<SubjectItem>
+        _subjects = new();
+
+    private string _subjectName =
+        string.Empty;
+
+    private string _message =
+        string.Empty;
+
+    private string _messageClass =
+        "error-message";
+
+    private bool _isWorking;
+
+    private bool _isLoading;
+
+    protected override async Task
+        OnInitializedAsync()
+    {
+        if (Session.IsLoggedIn)
+        {
+            await LoadSubjects();
+        }
+    }
+
+    private async Task LoadSubjects()
+    {
+        if (!Session.IsLoggedIn)
+        {
+            return;
+        }
+
+        _isLoading = true;
+
+        try
+        {
+            var results =
+                await Supabase
+                    .GetSubjectsAsync(
+                        Session.AccessToken!);
+
+            _subjects.Clear();
+
+            _subjects.AddRange(results);
+        }
+        catch
+        {
+            _message =
+                "Subjects could not be loaded.";
+
+            _messageClass =
+                "error-message";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task AddSubject()
+    {
+        var cleanName =
+            _subjectName.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            cleanName))
+        {
+            _message =
+                "Enter a subject name.";
+
+            _messageClass =
+                "error-message";
+
+            return;
+        }
+
+        if (cleanName.Length > 80)
+        {
+            _message =
+                "Subject names must be " +
+                "80 characters or fewer.";
+
+            _messageClass =
+                "error-message";
+
+            return;
+        }
+
+        _isWorking = true;
+
+        _message =
+            string.Empty;
+
+        try
+        {
+            await Supabase.AddSubjectAsync(
+                Session.UserId!,
+                cleanName,
+                Session.AccessToken!);
+
+            _subjectName =
+                string.Empty;
+
+            _message =
+                "Subject saved.";
+
+            _messageClass =
+                "success-message";
+
+            await LoadSubjects();
+        }
+        catch
+        {
+            _message =
+                "The subject could not be saved.";
+
+            _messageClass =
+                "error-message";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    private async Task DeleteSubject(
+        Guid subjectId)
+    {
+        if (!Session.IsLoggedIn)
+        {
+            return;
+        }
+
+        try
+        {
+            await Supabase.DeleteSubjectAsync(
+                subjectId,
+                Session.AccessToken!);
+
+            await LoadSubjects();
+        }
+        catch
+        {
+            _message =
+                "The subject could not be deleted.";
+
+            _messageClass =
+                "error-message";
+        }
+    }
+}

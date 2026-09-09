@@ -1,0 +1,83 @@
+﻿@page "/"
+@page "/dashboard"
+
+@inject AppSession Session
+
+<PageTitle>Dashboard | StudySprint</PageTitle>
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">STUDYSPRINT</p>
+        <h1>Dashboard</h1>
+
+        <p>
+            Organize short study sessions and keep
+            your academic goals manageable.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            <strong>You are not signed in.</strong>
+
+            <p>
+                Sign in to manage your subjects
+                and study information.
+            </p>
+
+            <a class="primary-link"
+               href="login">
+                Go to Login
+            </a>
+        </div>
+    }
+    else
+    {
+        <p class="welcome-message">
+            Signed in as
+            <strong>@Session.Email</strong>
+        </p>
+
+        <div class="dashboard-grid">
+            <a class="feature-card"
+               href="subjects">
+
+                <span class="feature-number">01</span>
+
+                <h2>Subjects</h2>
+
+                <p>
+                    Organize the classes and subjects
+                    you need to study.
+                </p>
+            </a>
+
+            <a class="feature-card"
+               href="sessions">
+
+                <span class="feature-number">02</span>
+
+                <h2>Study Sessions</h2>
+
+                <p>
+                    Plan short sessions around
+                    specific academic goals.
+                </p>
+            </a>
+
+            <a class="feature-card"
+               href="progress">
+
+                <span class="feature-number">03</span>
+
+                <h2>Progress</h2>
+
+                <p>
+                    Review completed and remaining
+                    study sessions.
+                </p>
+            </a>
+        </div>
+    }
+</section>

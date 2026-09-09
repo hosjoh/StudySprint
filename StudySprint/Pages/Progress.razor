@@ -1,0 +1,67 @@
+﻿@page "/progress"
+
+@inject AppSession Session
+
+<PageTitle>Progress | StudySprint</PageTitle>
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">TRACK</p>
+
+        <h1>Study Progress</h1>
+
+        <p>
+            Review completed and remaining
+            study sessions.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            You must
+            <a href="login">sign in</a>
+            before viewing progress.
+        </div>
+    }
+    else
+    {
+        <div class="dashboard-grid">
+            <div class="stat-card">
+                <span class="stat-number">
+                    0
+                </span>
+
+                <span>
+                    Completed Sessions
+                </span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number">
+                    0
+                </span>
+
+                <span>
+                    Remaining Sessions
+                </span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number">
+                    0%
+                </span>
+
+                <span>
+                    Completion Rate
+                </span>
+            </div>
+        </div>
+
+        <p class="phase-note">
+            Live progress calculations will be
+            implemented when study-session
+            management is completed.
+        </p>
+    }
+</section>

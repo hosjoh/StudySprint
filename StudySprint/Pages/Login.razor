@@ -1,0 +1,160 @@
+﻿@page "/login"
+
+@using System.ComponentModel.DataAnnotations
+
+@inject SupabaseService Supabase
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>Login | StudySprint</PageTitle>
+
+<section class="login-wrapper">
+    <div class="login-card">
+        <p class="eyebrow">STUDYSPRINT</p>
+
+        <h1>Welcome Back</h1>
+
+        <p class="login-intro">
+            Sign in to continue planning
+            your study sessions.
+        </p>
+
+        @if (Session.IsLoggedIn)
+        {
+            <div class="success-message">
+                You are signed in as
+                <strong>@Session.Email</strong>.
+            </div>
+
+            <button type="button"
+                    class="secondary-button"
+                    @onclick="HandleLogout">
+                Log Out
+            </button>
+        }
+        else
+        {
+            <EditForm Model="_loginModel"
+                      OnValidSubmit="HandleLogin">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label for="email">
+                        Email Address
+                    </label>
+
+                    <InputText id="email"
+                               class="form-control"
+                               @bind-Value="_loginModel.Email" />
+
+                    <ValidationMessage For="@(() => _loginModel.Email)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="password">
+                        Password
+                    </label>
+
+                    <InputText id="password"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_loginModel.Password" />
+
+                    <ValidationMessage For="@(() => _loginModel.Password)" />
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(
+                    _errorMessage))
+                {
+                    <div class="error-message">
+                        @_errorMessage
+                    </div>
+                }
+
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isWorking">
+
+                    @(_isWorking
+                        ? "Signing In..."
+                        : "Sign In")
+                </button>
+            </EditForm>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly LoginModel _loginModel =
+        new();
+
+    private bool _isWorking;
+
+    private string _errorMessage =
+        string.Empty;
+
+    private async Task HandleLogin()
+    {
+        _isWorking = true;
+
+        _errorMessage =
+            string.Empty;
+
+        var result =
+            await Supabase.SignInAsync(
+                _loginModel.Email.Trim(),
+                _loginModel.Password);
+
+        _isWorking = false;
+
+        if (!result.Success)
+        {
+            _errorMessage =
+                result.ErrorMessage ??
+                "Login failed.";
+
+            return;
+        }
+
+        Session.SignIn(
+            result.UserId!,
+            result.Email!,
+            result.AccessToken!);
+
+        Navigation.NavigateTo(
+            "/dashboard");
+    }
+
+    private void HandleLogout()
+    {
+        Session.SignOut();
+
+        _loginModel.Email =
+            string.Empty;
+
+        _loginModel.Password =
+            string.Empty;
+
+        _errorMessage =
+            string.Empty;
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(
+            ErrorMessage =
+                "Email is required.")]
+        [EmailAddress(
+            ErrorMessage =
+                "Enter a valid email address.")]
+        public string Email { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage =
+                "Password is required.")]
+        public string Password { get; set; } =
+            string.Empty;
+    }
+}

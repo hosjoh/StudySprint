@@ -1,0 +1,63 @@
+﻿@page "/sessions"
+
+@inject AppSession Session
+
+<PageTitle>Study Sessions | StudySprint</PageTitle>
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">PLAN</p>
+
+        <h1>Study Sessions</h1>
+
+        <p>
+            Plan short, focused study sessions
+            around a specific subject and goal.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            You must
+            <a href="login">sign in</a>
+            before planning study sessions.
+        </div>
+    }
+    else
+    {
+        <div class="placeholder-panel">
+            <h2>Plan a Session</h2>
+
+            <div class="form-group">
+                <label>
+                    Study Goal
+                </label>
+
+                <input class="form-control"
+                       placeholder="Example: Review Chapter 4" />
+            </div>
+
+            <div class="form-group">
+                <label>
+                    Session Length
+                </label>
+
+                <select class="form-control">
+                    <option>15 minutes</option>
+                    <option selected>
+                        25 minutes
+                    </option>
+                    <option>45 minutes</option>
+                    <option>60 minutes</option>
+                </select>
+            </div>
+
+            <p class="phase-note">
+                Study-session creation will be
+                connected to the database during
+                the next development phase.
+            </p>
+        </div>
+    }
+</section>
