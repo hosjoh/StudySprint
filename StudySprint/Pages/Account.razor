@@ -1,0 +1,240 @@
+﻿@page "/account"
+
+@using System.ComponentModel.DataAnnotations
+
+@inject AppSession Session
+@inject SupabaseService Supabase
+
+<PageTitle>Account | StudySprint</PageTitle>
+
+@* Phase 2 account page for authenticated password changes. *@
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">ACCOUNT SECURITY</p>
+
+        <h1>Account</h1>
+
+        <p>
+            Change the password associated with
+            your StudySprint account.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            You must
+            <a href="login">sign in</a>
+            before changing your password.
+        </div>
+    }
+    else
+    {
+        <div class="account-panel">
+            <p>
+                Signed in as
+                <strong>@Session.Email</strong>
+            </p>
+
+            <EditForm Model="_model"
+                      OnValidSubmit="ChangePassword">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label for="currentPassword">
+                        Current Password
+                    </label>
+
+                    <InputText id="currentPassword"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.CurrentPassword" />
+
+                    <ValidationMessage For="@(() => _model.CurrentPassword)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="newPassword">
+                        New Password
+                    </label>
+
+                    <InputText id="newPassword"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.NewPassword" />
+                </div>
+
+                <div class="password-rules">
+                    <strong>Password Requirements</strong>
+
+                    <ul>
+                        <li>At least 8 characters</li>
+                        <li>At least one uppercase letter</li>
+                        <li>At least one lowercase letter</li>
+                        <li>At least one number</li>
+                        <li>At least one special character</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmNewPassword">
+                        Confirm New Password
+                    </label>
+
+                    <InputText id="confirmNewPassword"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.ConfirmNewPassword" />
+                </div>
+
+                @if (_passwordErrors.Count > 0)
+                {
+                    <div class="error-message">
+                        <ul>
+                            @foreach (var error in _passwordErrors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <div class="error-message">
+                        @_errorMessage
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_successMessage))
+                {
+                    <div class="success-message">
+                        @_successMessage
+                    </div>
+                }
+
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isWorking">
+
+                    @(_isWorking
+                        ? "Updating..."
+                        : "Change Password")
+                </button>
+            </EditForm>
+        </div>
+    }
+</section>
+
+@code {
+    private ChangePasswordModel
+        _model = new();
+
+    private readonly List<string>
+        _passwordErrors = new();
+
+    private string _errorMessage =
+        string.Empty;
+
+    private string _successMessage =
+        string.Empty;
+
+    private bool _isWorking;
+
+    /// <summary>
+    /// Verifies the current password before requesting
+    /// the authenticated Supabase password update.
+    /// </summary>
+    private async Task ChangePassword()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _passwordErrors.Clear();
+
+        _passwordErrors.AddRange(
+            PasswordRules.GetErrors(
+                _model.NewPassword));
+
+        if (_model.NewPassword !=
+            _model.ConfirmNewPassword)
+        {
+            _passwordErrors.Add(
+                "New password and confirmation must match.");
+        }
+
+        if (_model.CurrentPassword ==
+            _model.NewPassword)
+        {
+            _passwordErrors.Add(
+                "The new password must be different from the current password.");
+        }
+
+        if (_passwordErrors.Count > 0)
+        {
+            return;
+        }
+
+        _isWorking = true;
+
+        // Re-authenticate to verify the current password.
+        var verification =
+            await Supabase.SignInAsync(
+                Session.Email!,
+                _model.CurrentPassword);
+
+        if (!verification.Success)
+        {
+            _isWorking = false;
+
+            _errorMessage =
+                "The current password is incorrect.";
+
+            return;
+        }
+
+        var result =
+            await Supabase.ChangePasswordAsync(
+                _model.NewPassword,
+                verification.AccessToken!);
+
+        _isWorking = false;
+
+        if (!result.Success)
+        {
+            _errorMessage =
+                result.ErrorMessage ??
+                "Password could not be changed.";
+
+            return;
+        }
+
+        // Keep the newly verified session information.
+        Session.SignIn(
+            verification.UserId!,
+            verification.Email!,
+            verification.AccessToken!);
+
+        _successMessage =
+            "Your password was changed successfully.";
+
+        _model =
+            new ChangePasswordModel();
+    }
+
+    private sealed class ChangePasswordModel
+    {
+        [Required]
+        public string CurrentPassword { get; set; } =
+            string.Empty;
+
+        [Required]
+        public string NewPassword { get; set; } =
+            string.Empty;
+
+        [Required]
+        public string ConfirmNewPassword { get; set; } =
+            string.Empty;
+    }
+}

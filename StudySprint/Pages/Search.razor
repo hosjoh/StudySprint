@@ -1,0 +1,186 @@
+﻿@page "/search"
+
+@using System.ComponentModel.DataAnnotations
+
+@inject AppSession Session
+@inject SupabaseService Supabase
+
+<PageTitle>Search | StudySprint</PageTitle>
+
+@* Phase 2 search feature with wildcard support. *@
+
+<section class="page-card">
+    <div class="page-heading">
+        <p class="eyebrow">SEARCH</p>
+
+        <h1>Search Subjects</h1>
+
+        <p>
+            Search the subjects saved to your StudySprint account.
+        </p>
+    </div>
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="notice">
+            You must
+            <a href="login">sign in</a>
+            before searching your subjects.
+        </div>
+    }
+    else
+    {
+        <div class="search-help">
+            <strong>Search Instructions</strong>
+
+            <p>
+                Enter all or part of a subject name.
+                Searches are not case-sensitive.
+            </p>
+
+            <p>
+                Use <strong>*</strong> to represent any number
+                of characters and <strong>?</strong> to represent
+                one character.
+            </p>
+
+            <div class="search-examples">
+                Examples:
+                <code>Bio*</code>,
+                <code>*History*</code>,
+                <code>C?lculus</code>
+            </div>
+        </div>
+
+        <EditForm Model="_searchModel"
+                  OnValidSubmit="RunSearch">
+
+            <DataAnnotationsValidator />
+
+            <div class="form-group">
+                <label for="searchText">
+                    Subject Search
+                </label>
+
+                <InputText id="searchText"
+                           class="form-control"
+                           placeholder="Example: Bio*"
+                           @bind-Value="_searchModel.SearchText" />
+
+                <ValidationMessage For="@(() => _searchModel.SearchText)" />
+            </div>
+
+            <button type="submit"
+                    class="primary-button"
+                    disabled="@_isSearching">
+
+                @(_isSearching
+                    ? "Searching..."
+                    : "Search")
+            </button>
+        </EditForm>
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <p class="error-message">
+                @_errorMessage
+            </p>
+        }
+
+        @if (_hasSearched)
+        {
+            <div class="section-divider"></div>
+
+            <h2>Search Results</h2>
+
+            <p class="result-count">
+                @_results.Count record(s) returned.
+            </p>
+
+            @if (_results.Count == 0)
+            {
+                <div class="empty-state">
+                    No matching subjects were found.
+                </div>
+            }
+            else
+            {
+                <div class="search-results">
+                    @foreach (var subject in _results)
+                    {
+                        <div class="search-result-card">
+                            <strong>@subject.Name</strong>
+
+                            <span>
+                                Added
+                                @subject.CreatedAt
+                                .ToLocalTime()
+                                .ToString("MMM d, yyyy")
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</section>
+
+@code {
+    private readonly SearchModel
+        _searchModel = new();
+
+    private readonly List<SubjectItem>
+        _results = new();
+
+    private bool _isSearching;
+
+    private bool _hasSearched;
+
+    private string _errorMessage =
+        string.Empty;
+
+    /// <summary>
+    /// Searches only the signed-in user's subject records.
+    /// RLS continues to protect records belonging to other users.
+    /// </summary>
+    private async Task RunSearch()
+    {
+        _errorMessage = string.Empty;
+        _results.Clear();
+
+        _isSearching = true;
+        _hasSearched = true;
+
+        try
+        {
+            var results =
+                await Supabase.SearchSubjectsAsync(
+                    _searchModel.SearchText,
+                    Session.AccessToken!);
+
+            _results.AddRange(results);
+        }
+        catch
+        {
+            _errorMessage =
+                "The search could not be completed.";
+        }
+        finally
+        {
+            _isSearching = false;
+        }
+    }
+
+    private sealed class SearchModel
+    {
+        [Required(
+            ErrorMessage =
+                "Enter a search term or wildcard.")]
+        [StringLength(
+            80,
+            ErrorMessage =
+                "Search text must be 80 characters or fewer.")]
+        public string SearchText { get; set; } =
+            string.Empty;
+    }
+}

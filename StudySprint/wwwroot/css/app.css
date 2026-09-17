@@ -357,3 +357,88 @@ button:disabled {
         flex-direction: column;
     }
 }
+
+.password-rules {
+    margin: 0.5rem 0 1.25rem;
+    padding: 1rem;
+    border: 1px solid #dce3eb;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #556274;
+    font-size: 0.9rem;
+}
+
+    .password-rules ul {
+        margin: 0.6rem 0 0;
+        padding-left: 1.25rem;
+    }
+
+    .password-rules li {
+        margin-bottom: 0.25rem;
+    }
+
+.search-help {
+    margin-bottom: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid #dbe3ec;
+    border-radius: 9px;
+    background: #f8fafc;
+}
+
+    .search-help p {
+        margin: 0.5rem 0;
+        color: #596679;
+        line-height: 1.5;
+    }
+
+.search-examples {
+    margin-top: 0.8rem;
+}
+
+    .search-examples code {
+        margin-right: 0.35rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        background: #e8edf4;
+    }
+
+.result-count {
+    color: #697689;
+}
+
+.search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.search-result-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid #e0e6ed;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+    .search-result-card span {
+        color: #768295;
+        font-size: 0.85rem;
+    }
+
+.account-panel {
+    max-width: 600px;
+    padding: 1.4rem;
+    border: 1px solid #e1e6ed;
+    border-radius: 10px;
+    background: #fafbfc;
+}
+
+@media (max-width: 700px) {
+    .search-result-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

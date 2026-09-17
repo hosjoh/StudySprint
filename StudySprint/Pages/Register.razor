@@ -1,0 +1,223 @@
+﻿@page "/register"
+
+@using System.ComponentModel.DataAnnotations
+
+@inject SupabaseService Supabase
+
+<PageTitle>Register | StudySprint</PageTitle>
+
+@* Phase 2 user-registration page. *@
+
+<section class="login-wrapper">
+    <div class="login-card">
+        <p class="eyebrow">CREATE ACCOUNT</p>
+
+        <h1>Join StudySprint</h1>
+
+        <p class="login-intro">
+            Create an account to save your subjects
+            and study information.
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(_successMessage))
+        {
+            <div class="success-message">
+                @_successMessage
+            </div>
+
+            <a class="primary-link"
+               href="login">
+                Go to Login
+            </a>
+        }
+        else
+        {
+            <EditForm Model="_model"
+                      OnValidSubmit="HandleRegistration">
+
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label for="displayName">
+                        Display Name
+                    </label>
+
+                    <InputText id="displayName"
+                               class="form-control"
+                               @bind-Value="_model.DisplayName" />
+
+                    <ValidationMessage For="@(() => _model.DisplayName)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="registerEmail">
+                        Email Address
+                    </label>
+
+                    <InputText id="registerEmail"
+                               class="form-control"
+                               @bind-Value="_model.Email" />
+
+                    <ValidationMessage For="@(() => _model.Email)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="registerPassword">
+                        Password
+                    </label>
+
+                    <InputText id="registerPassword"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.Password" />
+                </div>
+
+                <div class="password-rules">
+                    <strong>Password Requirements</strong>
+
+                    <ul>
+                        <li>At least 8 characters</li>
+                        <li>At least one uppercase letter</li>
+                        <li>At least one lowercase letter</li>
+                        <li>At least one number</li>
+                        <li>At least one special character</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">
+                        Confirm Password
+                    </label>
+
+                    <InputText id="confirmPassword"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.ConfirmPassword" />
+                </div>
+
+                @if (_passwordErrors.Count > 0)
+                {
+                    <div class="error-message">
+                        <ul>
+                            @foreach (var error in _passwordErrors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                {
+                    <div class="error-message">
+                        @_errorMessage
+                    </div>
+                }
+
+                <button type="submit"
+                        class="primary-button"
+                        disabled="@_isWorking">
+
+                    @(_isWorking
+                        ? "Creating Account..."
+                        : "Create Account")
+                </button>
+            </EditForm>
+        }
+    </div>
+</section>
+
+@code {
+    private RegisterModel _model = new();
+
+    private readonly List<string>
+        _passwordErrors = new();
+
+    private string _errorMessage =
+        string.Empty;
+
+    private string _successMessage =
+        string.Empty;
+
+    private bool _isWorking;
+
+    /// <summary>
+    /// Validates the form and creates the Supabase Auth user.
+    /// </summary>
+    private async Task HandleRegistration()
+    {
+        _errorMessage = string.Empty;
+        _successMessage = string.Empty;
+        _passwordErrors.Clear();
+
+        _passwordErrors.AddRange(
+            PasswordRules.GetErrors(
+                _model.Password));
+
+        if (_model.Password !=
+            _model.ConfirmPassword)
+        {
+            _passwordErrors.Add(
+                "Password and confirmation must match.");
+        }
+
+        if (_passwordErrors.Count > 0)
+        {
+            return;
+        }
+
+        _isWorking = true;
+
+        var result =
+            await Supabase.RegisterAsync(
+                _model.DisplayName.Trim(),
+                _model.Email.Trim(),
+                _model.Password);
+
+        _isWorking = false;
+
+        if (!result.Success)
+        {
+            _errorMessage =
+                result.ErrorMessage ??
+                "Registration could not be completed.";
+
+            return;
+        }
+
+        if (result.RequiresEmailConfirmation)
+        {
+            _successMessage =
+                "Account created. Check your email and " +
+                "confirm your address before signing in.";
+        }
+        else
+        {
+            _successMessage =
+                "Account created successfully. You can now sign in.";
+        }
+
+        _model = new RegisterModel();
+    }
+
+    private sealed class RegisterModel
+    {
+        [Required]
+        [StringLength(100)]
+        public string DisplayName { get; set; } =
+            string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } =
+            string.Empty;
+
+        [Required]
+        public string Password { get; set; } =
+            string.Empty;
+
+        [Required]
+        public string ConfirmPassword { get; set; } =
+            string.Empty;
+    }
+}
