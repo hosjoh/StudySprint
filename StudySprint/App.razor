@@ -1,6 +1,76 @@
-﻿<Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-</Router>
+﻿@inject AppSession Session
+@inject AuthStorageService AuthStorage
+
+@if (!_sessionLoaded)
+{
+    <div class="app-loading">
+        Loading StudySprint...
+    </div>
+}
+else
+{
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+
+            <RouteView RouteData="@routeData"
+                       DefaultLayout="@typeof(MainLayout)" />
+
+            <FocusOnNavigate RouteData="@routeData"
+                             Selector="h1" />
+
+        </Found>
+
+        <NotFound>
+
+            <PageTitle>Not Found | StudySprint</PageTitle>
+
+            <LayoutView Layout="@typeof(MainLayout)">
+
+                <section class="page-card">
+                    <h1>Page Not Found</h1>
+
+                    <p>
+                        The requested StudySprint page
+                        could not be found.
+                    </p>
+
+                    <a class="primary-link"
+                       href="">
+                        Return to Dashboard
+                    </a>
+                </section>
+
+            </LayoutView>
+
+        </NotFound>
+    </Router>
+}
+
+@code {
+    private bool _sessionLoaded;
+
+    /// <summary>
+    /// Restores a previously authenticated StudySprint
+    /// session when the Blazor application starts.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var storedSession =
+                await AuthStorage.LoadSessionAsync();
+
+            if (storedSession is not null)
+            {
+                Session.SignIn(
+                    storedSession.UserId,
+                    storedSession.Email,
+                    storedSession.AccessToken);
+            }
+        }
+        finally
+        {
+            _sessionLoaded = true;
+        }
+    }
+}

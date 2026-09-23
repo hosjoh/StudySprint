@@ -4,13 +4,26 @@
 
 @inject SupabaseService Supabase
 @inject AppSession Session
+@inject AuthStorageService AuthStorage
 @inject NavigationManager Navigation
 
 <PageTitle>Login | StudySprint</PageTitle>
 
+@*
+    StudySprint login page.
+
+    Users authenticate through Supabase Auth.
+    Successful login information is also stored in
+    browser sessionStorage so login survives page reloads.
+*@
+
 <section class="login-wrapper">
+
     <div class="login-card">
-        <p class="eyebrow">STUDYSPRINT</p>
+
+        <p class="eyebrow">
+            STUDYSPRINT
+        </p>
 
         <h1>Welcome Back</h1>
 
@@ -29,7 +42,9 @@
             <button type="button"
                     class="secondary-button"
                     @onclick="HandleLogout">
+
                 Log Out
+
             </button>
         }
         else
@@ -40,6 +55,7 @@
                 <DataAnnotationsValidator />
 
                 <div class="form-group">
+
                     <label for="email">
                         Email Address
                     </label>
@@ -48,10 +64,13 @@
                                class="form-control"
                                @bind-Value="_loginModel.Email" />
 
-                    <ValidationMessage For="@(() => _loginModel.Email)" />
+                    <ValidationMessage
+                        For="@(() => _loginModel.Email)" />
+
                 </div>
 
                 <div class="form-group">
+
                     <label for="password">
                         Password
                     </label>
@@ -61,7 +80,9 @@
                                class="form-control"
                                @bind-Value="_loginModel.Password" />
 
-                    <ValidationMessage For="@(() => _loginModel.Password)" />
+                    <ValidationMessage
+                        For="@(() => _loginModel.Password)" />
+
                 </div>
 
                 @if (!string.IsNullOrWhiteSpace(
@@ -79,13 +100,26 @@
                     @(_isWorking
                         ? "Signing In..."
                         : "Sign In")
+
                 </button>
+
             </EditForm>
+
+            <p class="login-register-link">
+                Don't have an account?
+                <a href="register">
+                    Create one
+                </a>
+            </p>
         }
+
     </div>
+
 </section>
 
 @code {
+
+    // Stores the values entered in the login form.
     private readonly LoginModel _loginModel =
         new();
 
@@ -94,41 +128,82 @@
     private string _errorMessage =
         string.Empty;
 
+    /// <summary>
+    /// Authenticates the user through Supabase and
+    /// stores the resulting session in memory and
+    /// browser sessionStorage.
+    /// </summary>
     private async Task HandleLogin()
     {
-        _isWorking = true;
-
         _errorMessage =
             string.Empty;
 
-        var result =
-            await Supabase.SignInAsync(
-                _loginModel.Email.Trim(),
-                _loginModel.Password);
+        _isWorking =
+            true;
 
-        _isWorking = false;
-
-        if (!result.Success)
+        try
         {
-            _errorMessage =
-                result.ErrorMessage ??
-                "Login failed.";
+            var result =
+                await Supabase.SignInAsync(
+                    _loginModel.Email.Trim(),
+                    _loginModel.Password);
 
-            return;
+            if (!result.Success)
+            {
+                _errorMessage =
+                    result.ErrorMessage ??
+                    "Login could not be completed.";
+
+                return;
+            }
+
+            Session.SignIn(
+                result.UserId!,
+                result.Email!,
+                result.AccessToken!);
+
+            await AuthStorage.SaveSessionAsync(
+                result.UserId!,
+                result.Email!,
+                result.AccessToken!);
+
+            /*
+             * Do not use "/dashboard" here.
+             *
+             * A leading slash would navigate to:
+             * https://hosjoh.github.io/dashboard
+             *
+             * Using "dashboard" respects the GitHub Pages
+             * base path:
+             * https://hosjoh.github.io/StudySprint/dashboard
+             */
+            Navigation.NavigateTo(
+                "dashboard");
         }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(
+                $"Login error: {ex}");
 
-        Session.SignIn(
-            result.UserId!,
-            result.Email!,
-            result.AccessToken!);
-
-        Navigation.NavigateTo(
-            "/dashboard");
+            _errorMessage =
+                "StudySprint could not complete the login.";
+        }
+        finally
+        {
+            _isWorking =
+                false;
+        }
     }
 
-    private void HandleLogout()
+    /// <summary>
+    /// Signs the user out of the active StudySprint
+    /// session and removes stored browser session data.
+    /// </summary>
+    private async Task HandleLogout()
     {
         Session.SignOut();
+
+        await AuthStorage.ClearSessionAsync();
 
         _loginModel.Email =
             string.Empty;
@@ -138,8 +213,14 @@
 
         _errorMessage =
             string.Empty;
+
+        Navigation.NavigateTo(
+            "login");
     }
 
+    /// <summary>
+    /// Represents the values entered into the login form.
+    /// </summary>
     private sealed class LoginModel
     {
         [Required(

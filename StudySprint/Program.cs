@@ -18,4 +18,6 @@ builder.Services.AddScoped<AppSession>();
 
 builder.Services.AddScoped<SupabaseService>();
 
+builder.Services.AddScoped<AuthStorageService>();
+
 await builder.Build().RunAsync();
