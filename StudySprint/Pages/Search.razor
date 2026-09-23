@@ -5,18 +5,31 @@
 @inject AppSession Session
 @inject SupabaseService Supabase
 
-<PageTitle>Search | StudySprint</PageTitle>
+<PageTitle>Search & Manage Subjects | StudySprint</PageTitle>
 
-@* Phase 2 search feature with wildcard support. *@
+@*
+    Phase 3 Search and Subject Management page.
+
+    This page allows authenticated users to:
+    - Search subject records
+    - Use wildcard searches
+    - Add subjects
+    - Edit subjects
+    - Delete subjects
+
+    Changes are immediately reflected in the search results.
+*@
 
 <section class="page-card">
-    <div class="page-heading">
-        <p class="eyebrow">SEARCH</p>
 
-        <h1>Search Subjects</h1>
+    <div class="page-heading">
+        <p class="eyebrow">SEARCH & MANAGE</p>
+
+        <h1>Subjects</h1>
 
         <p>
-            Search the subjects saved to your StudySprint account.
+            Search and manage the subjects saved
+            to your StudySprint account.
         </p>
     </div>
 
@@ -25,12 +38,65 @@
         <div class="notice">
             You must
             <a href="login">sign in</a>
-            before searching your subjects.
+            before searching or managing subjects.
         </div>
     }
     else
     {
+        <!-- ADD SUBJECT SECTION -->
+
+        <div class="crud-panel">
+
+            <h2>Add a Subject</h2>
+
+            <p>
+                Add a new course or subject to
+                your StudySprint account.
+            </p>
+
+            <label for="newSubject">
+                Subject Name
+            </label>
+
+            <input id="newSubject"
+                   class="form-control"
+                   maxlength="80"
+                   placeholder="Example: Biology"
+                   @bind="_newSubjectName"
+                   @bind:event="oninput" />
+
+            <button type="button"
+                    class="primary-button"
+                    disabled="@_isWorking"
+                    @onclick="AddSubject">
+
+                Add Subject
+            </button>
+
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(
+            _statusMessage))
+        {
+            <div class="success-message phase3-message">
+                @_statusMessage
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(
+            _errorMessage))
+        {
+            <div class="error-message phase3-message">
+                @_errorMessage
+            </div>
+        }
+
+        <div class="section-divider"></div>
+
+        <!-- SEARCH SECTION -->
+
         <div class="search-help">
+
             <strong>Search Instructions</strong>
 
             <p>
@@ -39,17 +105,26 @@
             </p>
 
             <p>
-                Use <strong>*</strong> to represent any number
-                of characters and <strong>?</strong> to represent
-                one character.
+                Use <strong>*</strong> to represent
+                any number of characters and
+                <strong>?</strong> to represent one
+                character.
             </p>
 
             <div class="search-examples">
+
                 Examples:
-                <code>Bio*</code>,
-                <code>*History*</code>,
+
+                <code>Bio*</code>
+
+                <code>*History*</code>
+
                 <code>C?lculus</code>
+
+                <code>*</code>
+
             </div>
+
         </div>
 
         <EditForm Model="_searchModel"
@@ -58,8 +133,9 @@
             <DataAnnotationsValidator />
 
             <div class="form-group">
+
                 <label for="searchText">
-                    Subject Search
+                    Search Subjects
                 </label>
 
                 <InputText id="searchText"
@@ -67,7 +143,9 @@
                            placeholder="Example: Bio*"
                            @bind-Value="_searchModel.SearchText" />
 
-                <ValidationMessage For="@(() => _searchModel.SearchText)" />
+                <ValidationMessage For="@(() =>
+                                        _searchModel.SearchText)" />
+
             </div>
 
             <button type="submit"
@@ -77,25 +155,26 @@
                 @(_isSearching
                     ? "Searching..."
                     : "Search")
-            </button>
-        </EditForm>
 
-        @if (!string.IsNullOrWhiteSpace(_errorMessage))
-        {
-            <p class="error-message">
-                @_errorMessage
-            </p>
-        }
+            </button>
+
+        </EditForm>
 
         @if (_hasSearched)
         {
             <div class="section-divider"></div>
 
-            <h2>Search Results</h2>
+            <div class="results-heading">
 
-            <p class="result-count">
-                @_results.Count record(s) returned.
-            </p>
+                <div>
+                    <h2>Search Results</h2>
+
+                    <p class="result-count">
+                        @_results.Count record(s) returned.
+                    </p>
+                </div>
+
+            </div>
 
             @if (_results.Count == 0)
             {
@@ -106,49 +185,165 @@
             else
             {
                 <div class="search-results">
+
                     @foreach (var subject in _results)
                     {
-                        <div class="search-result-card">
-                            <strong>@subject.Name</strong>
+                        <div class="subject-management-card">
 
-                            <span>
-                                Added
-                                @subject.CreatedAt
-                                .ToLocalTime()
-                                .ToString("MMM d, yyyy")
-                            </span>
+                            @if (_editingSubjectId ==
+                                 subject.Id)
+                            {
+                                <!-- EDIT MODE -->
+
+                                <div class="inline-edit">
+
+                                    <label>
+                                        Edit Subject
+                                    </label>
+
+                                    <input class="form-control"
+                                           maxlength="80"
+                                           @bind="_editSubjectName"
+                                           @bind:event="oninput" />
+
+                                    <div class="record-actions">
+
+                                        <button type="button"
+                                                class="primary-button"
+                                                disabled="@_isWorking"
+                                                @onclick="() =>
+                                                                                                SaveEdit(subject.Id)">
+
+Save
+</button>
+
+                                        <button type="button"
+                                                class="secondary-button"
+                                                disabled="@_isWorking"
+                                                @onclick="CancelEdit">
+
+                                            Cancel
+                                        </button>
+
+                                    </div>
+
+                                </div>
+                            }
+                            else
+                            {
+                                <!-- NORMAL DISPLAY MODE -->
+
+                                <div class="subject-record-info">
+
+                                    <strong class="subject-name">
+                                        @subject.Name
+                                    </strong>
+
+                                    <span class="small-text">
+                                        Added
+                                        @subject.CreatedAt
+                                        .ToLocalTime()
+                                        .ToString(
+                                        "MMM d, yyyy")
+                                    </span>
+
+                                </div>
+
+                                <div class="record-actions">
+
+                                    <button type="button"
+                                            class="secondary-button"
+                                            disabled="@_isWorking"
+                                            @onclick="() =>
+                                                                                        StartEdit(subject)">
+
+Edit
+</button>
+
+                                    <button type="button"
+                                            class="danger-button"
+                                            disabled="@_isWorking"
+                                            @onclick="() =>
+                                                                                        DeleteSubject(
+                                                                                            subject.Id)">
+
+Delete
+</button>
+
+                                </div>
+                            }
+
                         </div>
                     }
+
                 </div>
             }
         }
     }
+
 </section>
 
 @code {
-    private readonly SearchModel
-        _searchModel = new();
+
+    // Search begins with * so all of the user's
+    // subjects can be displayed immediately.
+    private readonly SearchModel _searchModel =
+        new()
+        {
+            SearchText = "*"
+        };
 
     private readonly List<SubjectItem>
         _results = new();
 
-    private bool _isSearching;
+    private string _newSubjectName =
+        string.Empty;
 
-    private bool _hasSearched;
+    private string _editSubjectName =
+        string.Empty;
+
+    private Guid? _editingSubjectId;
 
     private string _errorMessage =
         string.Empty;
 
+    private string _statusMessage =
+        string.Empty;
+
+    private bool _isSearching;
+
+    private bool _isWorking;
+
+    private bool _hasSearched;
+
     /// <summary>
-    /// Searches only the signed-in user's subject records.
-    /// RLS continues to protect records belonging to other users.
+    /// Displays all subjects when the page is first opened
+    /// by an authenticated user.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsLoggedIn)
+        {
+            await RunSearch();
+        }
+    }
+
+    /// <summary>
+    /// Searches the authenticated user's subjects.
+    /// Wildcard processing is performed by SupabaseService.
     /// </summary>
     private async Task RunSearch()
     {
-        _errorMessage = string.Empty;
-        _results.Clear();
+        if (!Session.IsLoggedIn)
+        {
+            return;
+        }
+
+        _errorMessage =
+            string.Empty;
 
         _isSearching = true;
+
         _hasSearched = true;
 
         try
@@ -158,10 +353,14 @@
                     _searchModel.SearchText,
                     Session.AccessToken!);
 
+            _results.Clear();
+
             _results.AddRange(results);
         }
         catch
         {
+            _results.Clear();
+
             _errorMessage =
                 "The search could not be completed.";
         }
@@ -171,16 +370,224 @@
         }
     }
 
+    /// <summary>
+    /// Adds a new subject to the database and then
+    /// searches for it so the addition is immediately
+    /// visible on this page.
+    /// </summary>
+    private async Task AddSubject()
+    {
+        ClearMessages();
+
+        var cleanName =
+            _newSubjectName.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            cleanName))
+        {
+            _errorMessage =
+                "Enter a subject name.";
+
+            return;
+        }
+
+        if (cleanName.Length > 80)
+        {
+            _errorMessage =
+                "Subject names must contain " +
+                "80 characters or fewer.";
+
+            return;
+        }
+
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.AddSubjectAsync(
+                Session.UserId!,
+                cleanName,
+                Session.AccessToken!);
+
+            _newSubjectName =
+                string.Empty;
+
+            // Search for the new subject so its
+            // database record appears immediately.
+            _searchModel.SearchText =
+                cleanName;
+
+            await RunSearch();
+
+            _statusMessage =
+                "Subject added successfully.";
+        }
+        catch
+        {
+            _errorMessage =
+                "The subject could not be added.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Places a selected subject into inline edit mode.
+    /// </summary>
+    private void StartEdit(
+        SubjectItem subject)
+    {
+        ClearMessages();
+
+        _editingSubjectId =
+            subject.Id;
+
+        _editSubjectName =
+            subject.Name;
+    }
+
+    /// <summary>
+    /// Cancels the current subject edit without
+    /// changing the database.
+    /// </summary>
+    private void CancelEdit()
+    {
+        _editingSubjectId =
+            null;
+
+        _editSubjectName =
+            string.Empty;
+    }
+
+    /// <summary>
+    /// Saves a changed subject name to Supabase and
+    /// immediately displays the updated record.
+    /// </summary>
+    private async Task SaveEdit(
+        Guid subjectId)
+    {
+        ClearMessages();
+
+        var cleanName =
+            _editSubjectName.Trim();
+
+        if (string.IsNullOrWhiteSpace(
+            cleanName))
+        {
+            _errorMessage =
+                "The subject name cannot be blank.";
+
+            return;
+        }
+
+        if (cleanName.Length > 80)
+        {
+            _errorMessage =
+                "Subject names must contain " +
+                "80 characters or fewer.";
+
+            return;
+        }
+
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.UpdateSubjectAsync(
+                subjectId,
+                cleanName,
+                Session.AccessToken!);
+
+            _editingSubjectId =
+                null;
+
+            _editSubjectName =
+                string.Empty;
+
+            // Search for the new name so the effect
+            // of the edit is visible immediately.
+            _searchModel.SearchText =
+                cleanName;
+
+            await RunSearch();
+
+            _statusMessage =
+                "Subject updated successfully.";
+        }
+        catch
+        {
+            _errorMessage =
+                "The subject could not be updated.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Deletes the selected subject and immediately
+    /// refreshes the current search results.
+    /// </summary>
+    private async Task DeleteSubject(
+        Guid subjectId)
+    {
+        ClearMessages();
+
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.DeleteSubjectAsync(
+                subjectId,
+                Session.AccessToken!);
+
+            _editingSubjectId =
+                null;
+
+            await RunSearch();
+
+            _statusMessage =
+                "Subject deleted successfully.";
+        }
+        catch
+        {
+            _errorMessage =
+                "The subject could not be deleted.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Clears status and error messages before
+    /// another database operation begins.
+    /// </summary>
+    private void ClearMessages()
+    {
+        _statusMessage =
+            string.Empty;
+
+        _errorMessage =
+            string.Empty;
+    }
+
     private sealed class SearchModel
     {
         [Required(
             ErrorMessage =
                 "Enter a search term or wildcard.")]
+
         [StringLength(
             80,
             ErrorMessage =
                 "Search text must be 80 characters or fewer.")]
+
         public string SearchText { get; set; } =
-            string.Empty;
+            "*";
     }
 }

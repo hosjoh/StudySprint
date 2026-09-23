@@ -432,6 +432,48 @@ public sealed class SupabaseService
                 "The subject could not be saved.");
         }
     }
+    /// <summary>
+    /// Updates the name of a subject belonging to the
+    /// currently authenticated StudySprint user.
+    /// Row Level Security prevents users from updating
+    /// subject records that belong to another account.
+    /// </summary>
+    public async Task UpdateSubjectAsync(
+        Guid subjectId,
+        string subjectName,
+        string accessToken)
+    {
+        using var request =
+            CreateAuthorizedRequest(
+                HttpMethod.Patch,
+                $"{_supabaseUrl}/rest/v1/subjects" +
+                $"?id=eq.{subjectId}",
+                accessToken);
+
+        request.Headers.TryAddWithoutValidation(
+            "Prefer",
+            "return=minimal");
+
+        request.Content = JsonContent.Create(
+            new
+            {
+                name = subjectName
+            });
+
+        using var response =
+            await _httpClient.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message =
+                await GetErrorMessageAsync(
+                    response,
+                    "The subject could not be updated.");
+
+            throw new InvalidOperationException(
+                message);
+        }
+    }
 
     /// <summary>
     /// Deletes one subject belonging to the authenticated user.

@@ -442,3 +442,80 @@ button:disabled {
         flex-direction: column;
     }
 }
+
+.crud-panel {
+    max-width: 620px;
+    padding: 1.4rem;
+    border: 1px solid #e1e6ed;
+    border-radius: 10px;
+    background: #fafbfc;
+}
+
+    .crud-panel h2 {
+        margin-top: 0;
+    }
+
+    .crud-panel p {
+        color: #667386;
+        line-height: 1.5;
+    }
+
+.phase3-message {
+    margin-top: 1rem;
+}
+
+.results-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.subject-management-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 1.15rem;
+    border: 1px solid #e0e6ed;
+    border-radius: 9px;
+    background: #ffffff;
+}
+
+.subject-record-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.subject-name {
+    font-size: 1.05rem;
+}
+
+.record-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.inline-edit {
+    width: 100%;
+}
+
+    .inline-edit label {
+        display: block;
+        margin-bottom: 0.45rem;
+        font-weight: 700;
+    }
+
+@media (max-width: 700px) {
+    .subject-management-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .record-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+}
