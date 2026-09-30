@@ -1,63 +1,483 @@
-﻿@page "/sessions"
+@page "/sessions"
 
 @inject AppSession Session
+@inject SupabaseService Supabase
 
 <PageTitle>Study Sessions | StudySprint</PageTitle>
 
 <section class="page-card">
     <div class="page-heading">
-        <p class="eyebrow">PLAN</p>
-
-        <h1>Study Sessions</h1>
-
-        <p>
-            Plan short, focused study sessions
-            around a specific subject and goal.
-        </p>
+        <p class="eyebrow">STUDY SESSIONS</p>
+        <h1>Plan and Track Sessions</h1>
+        <p>Create a focused study goal, choose a subject, and track completion.</p>
     </div>
 
     @if (!Session.IsLoggedIn)
     {
         <div class="notice">
-            You must
-            <a href="login">sign in</a>
-            before planning study sessions.
+            You must <a href="login">sign in</a> before managing study sessions.
         </div>
     }
     else
     {
-        <div class="placeholder-panel">
-            <h2>Plan a Session</h2>
+        <div class="session-form-card">
+            <h2>@(_editingSessionId is null ? "Add Study Session" : "Edit Study Session")</h2>
 
-            <div class="form-group">
-                <label>
-                    Study Goal
-                </label>
+            <div class="session-form-grid">
+                <div class="form-group">
+                    <label for="sessionSubject">Subject</label>
+                    <select id="sessionSubject" class="form-control" @bind="_form.SubjectId">
+                        <option value="">No subject selected</option>
+                        @foreach (var subject in _subjects)
+                        {
+                            <option value="@subject.Id">@subject.Name</option>
+                        }
+                    </select>
+                </div>
 
-                <input class="form-control"
-                       placeholder="Example: Review Chapter 4" />
+                <div class="form-group session-goal-field">
+                    <label for="sessionGoal">Study Goal</label>
+                    <input id="sessionGoal"
+                           class="form-control"
+                           maxlength="200"
+                           placeholder="Example: Review chapter 5 notes"
+                           @bind="_form.Goal"
+                           @bind:event="oninput" />
+                </div>
+
+                <div class="form-group">
+                    <label for="sessionDate">Date</label>
+                    <InputDate id="sessionDate"
+                               class="form-control"
+                               @bind-Value="_form.SessionDate" />
+                </div>
+
+                <div class="form-group">
+                    <label for="sessionDuration">Minutes</label>
+                    <InputNumber id="sessionDuration"
+                                 class="form-control"
+                                 min="5"
+                                 max="240"
+                                 @bind-Value="_form.DurationMinutes" />
+                </div>
             </div>
 
-            <div class="form-group">
-                <label>
-                    Session Length
-                </label>
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="error-message">@_errorMessage</div>
+            }
 
-                <select class="form-control">
-                    <option>15 minutes</option>
-                    <option selected>
-                        25 minutes
-                    </option>
-                    <option>45 minutes</option>
-                    <option>60 minutes</option>
-                </select>
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <div class="success-message">@_statusMessage</div>
+            }
+
+            <div class="record-actions">
+                @if (_editingSessionId is null)
+                {
+                    <button type="button"
+                            class="primary-button"
+                            disabled="@_isWorking"
+                            @onclick="AddSession">
+                        Add Session
+                    </button>
+                }
+                else
+                {
+                    <button type="button"
+                            class="primary-button"
+                            disabled="@_isWorking"
+                            @onclick="SaveEdit">
+                        Save Changes
+                    </button>
+
+                    <button type="button"
+                            class="secondary-button"
+                            disabled="@_isWorking"
+                            @onclick="CancelEdit">
+                        Cancel
+                    </button>
+                }
             </div>
-
-            <p class="phase-note">
-                Study-session creation will be
-                connected to the database during
-                the next development phase.
-            </p>
         </div>
+
+        <div class="section-divider"></div>
+
+        <div class="results-heading">
+            <div>
+                <h2>Your Sessions</h2>
+                <p class="result-count">@_sessions.Count session(s)</p>
+            </div>
+
+            <button type="button"
+                    class="secondary-button"
+                    disabled="@_isLoading"
+                    @onclick="LoadData">
+                Refresh
+            </button>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="empty-state">Loading study sessions...</div>
+        }
+        else if (_sessions.Count == 0)
+        {
+            <div class="empty-state">
+                No study sessions have been created yet.
+            </div>
+        }
+        else
+        {
+            <div class="study-session-list">
+                @foreach (var studySession in _sessions)
+                {
+                    <article class="study-session-card @(studySession.Completed ? "is-complete" : string.Empty)">
+                        <div class="session-card-main">
+                            <div class="session-card-heading">
+                                <span class="session-status @(studySession.Completed ? "status-complete" : "status-planned")">
+                                    @(studySession.Completed ? "Completed" : "Planned")
+                                </span>
+
+                                <strong>@GetSubjectName(studySession.SubjectId)</strong>
+                            </div>
+
+                            <h3>@studySession.Goal</h3>
+
+                            <div class="session-meta">
+                                <span>@studySession.SessionDate.ToString("MMM d, yyyy")</span>
+                                <span>@studySession.DurationMinutes minutes</span>
+                            </div>
+                        </div>
+
+                        <div class="record-actions session-actions">
+                            <button type="button"
+                                    class="secondary-button"
+                                    disabled="@_isWorking"
+                                    @onclick="() => ToggleCompleted(studySession)">
+                                @(studySession.Completed ? "Mark Incomplete" : "Mark Complete")
+                            </button>
+
+                            <button type="button"
+                                    class="secondary-button"
+                                    disabled="@_isWorking"
+                                    @onclick="() => StartEdit(studySession)">
+                                Edit
+                            </button>
+
+                            <button type="button"
+                                    class="danger-button"
+                                    disabled="@_isWorking"
+                                    @onclick="() => DeleteSession(studySession.Id)">
+                                Delete
+                            </button>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
     }
 </section>
+
+@code {
+    private readonly List<SubjectItem> _subjects = new();
+    private readonly List<StudySessionItem> _sessions = new();
+
+    private SessionForm _form = SessionForm.CreateDefault();
+    private Guid? _editingSessionId;
+    private bool _isLoading;
+    private bool _isWorking;
+    private string _errorMessage = string.Empty;
+    private string _statusMessage = string.Empty;
+
+    /// <summary>
+    /// Loads subject choices and the signed-in user's study sessions.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsLoggedIn)
+        {
+            await LoadData();
+        }
+    }
+
+    private async Task LoadData()
+    {
+        if (!Session.IsLoggedIn)
+        {
+            return;
+        }
+
+        _isLoading = true;
+
+        try
+        {
+            var subjects = await Supabase.GetSubjectsAsync(Session.AccessToken!);
+            var sessions = await Supabase.GetStudySessionsAsync(Session.AccessToken!);
+
+            _subjects.Clear();
+            _subjects.AddRange(subjects.OrderBy(subject => subject.Name));
+
+            _sessions.Clear();
+            _sessions.AddRange(sessions);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Study session load error: {ex}");
+            _errorMessage = "Study sessions could not be loaded.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Validates and inserts a new study session.
+    /// </summary>
+    private async Task AddSession()
+    {
+        ClearMessages();
+
+        var validationError = ValidateForm(_form);
+        if (validationError is not null)
+        {
+            _errorMessage = validationError;
+            return;
+        }
+
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.AddStudySessionAsync(
+                Session.UserId!,
+                ParseSubjectId(_form.SubjectId),
+                _form.Goal.Trim(),
+                _form.SessionDate,
+                _form.DurationMinutes,
+                Session.AccessToken!);
+
+            _form = SessionForm.CreateDefault();
+            await LoadData();
+            _statusMessage = "Study session added successfully.";
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Study session add error: {ex}");
+            _errorMessage = "The study session could not be added.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Copies the selected record into the edit form.
+    /// </summary>
+    private void StartEdit(StudySessionItem studySession)
+    {
+        ClearMessages();
+
+        _editingSessionId = studySession.Id;
+        _form = new SessionForm
+        {
+            SubjectId = studySession.SubjectId?.ToString() ?? string.Empty,
+            Goal = studySession.Goal,
+            SessionDate = studySession.SessionDate,
+            DurationMinutes = studySession.DurationMinutes
+        };
+    }
+
+    /// <summary>
+    /// Saves the current inline edit back to PostgreSQL.
+    /// </summary>
+    private async Task SaveEdit()
+    {
+        if (_editingSessionId is null)
+        {
+            return;
+        }
+
+        ClearMessages();
+
+        var validationError = ValidateForm(_form);
+        if (validationError is not null)
+        {
+            _errorMessage = validationError;
+            return;
+        }
+
+        var existing = _sessions.FirstOrDefault(
+            studySession => studySession.Id == _editingSessionId.Value);
+
+        if (existing is null)
+        {
+            _errorMessage = "The selected session could not be found.";
+            return;
+        }
+
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.UpdateStudySessionAsync(
+                existing.Id,
+                ParseSubjectId(_form.SubjectId),
+                _form.Goal.Trim(),
+                _form.SessionDate,
+                _form.DurationMinutes,
+                existing.Completed,
+                Session.AccessToken!);
+
+            CancelEdit();
+            await LoadData();
+            _statusMessage = "Study session updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Study session edit error: {ex}");
+            _errorMessage = "The study session could not be updated.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Toggles the completed state and immediately refreshes the record list.
+    /// </summary>
+    private async Task ToggleCompleted(StudySessionItem studySession)
+    {
+        ClearMessages();
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.UpdateStudySessionAsync(
+                studySession.Id,
+                studySession.SubjectId,
+                studySession.Goal,
+                studySession.SessionDate,
+                studySession.DurationMinutes,
+                !studySession.Completed,
+                Session.AccessToken!);
+
+            await LoadData();
+            _statusMessage = "Study session status updated.";
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Study session status error: {ex}");
+            _errorMessage = "The study session status could not be updated.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    /// <summary>
+    /// Deletes the selected session from the database.
+    /// </summary>
+    private async Task DeleteSession(Guid sessionId)
+    {
+        ClearMessages();
+        _isWorking = true;
+
+        try
+        {
+            await Supabase.DeleteStudySessionAsync(
+                sessionId,
+                Session.AccessToken!);
+
+            if (_editingSessionId == sessionId)
+            {
+                CancelEdit();
+            }
+
+            await LoadData();
+            _statusMessage = "Study session deleted successfully.";
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Study session delete error: {ex}");
+            _errorMessage = "The study session could not be deleted.";
+        }
+        finally
+        {
+            _isWorking = false;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _editingSessionId = null;
+        _form = SessionForm.CreateDefault();
+    }
+
+    private string GetSubjectName(Guid? subjectId)
+    {
+        if (subjectId is null)
+        {
+            return "General Study";
+        }
+
+        return _subjects.FirstOrDefault(subject => subject.Id == subjectId.Value)?.Name
+            ?? "Deleted Subject";
+    }
+
+    private static Guid? ParseSubjectId(string subjectId)
+    {
+        return Guid.TryParse(subjectId, out var value)
+            ? value
+            : null;
+    }
+
+    private static string? ValidateForm(SessionForm form)
+    {
+        var goal = form.Goal.Trim();
+
+        if (string.IsNullOrWhiteSpace(goal))
+        {
+            return "Enter a study goal.";
+        }
+
+        if (goal.Length > 200)
+        {
+            return "Study goals must contain 200 characters or fewer.";
+        }
+
+        if (form.DurationMinutes is < 5 or > 240)
+        {
+            return "Session duration must be between 5 and 240 minutes.";
+        }
+
+        return null;
+    }
+
+    private void ClearMessages()
+    {
+        _errorMessage = string.Empty;
+        _statusMessage = string.Empty;
+    }
+
+    private sealed class SessionForm
+    {
+        public string SubjectId { get; set; } = string.Empty;
+        public string Goal { get; set; } = string.Empty;
+        public DateTime SessionDate { get; set; }
+        public int DurationMinutes { get; set; }
+
+        public static SessionForm CreateDefault()
+        {
+            return new SessionForm
+            {
+                SessionDate = DateTime.Today,
+                DurationMinutes = 25
+            };
+        }
+    }
+}

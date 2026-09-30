@@ -1,67 +1,161 @@
-﻿@page "/progress"
+@page "/progress"
 
 @inject AppSession Session
+@inject SupabaseService Supabase
 
 <PageTitle>Progress | StudySprint</PageTitle>
 
 <section class="page-card">
     <div class="page-heading">
-        <p class="eyebrow">TRACK</p>
-
-        <h1>Study Progress</h1>
-
-        <p>
-            Review completed and remaining
-            study sessions.
-        </p>
+        <p class="eyebrow">PROGRESS</p>
+        <h1>Your Study Progress</h1>
+        <p>Review completed sessions, planned work, and total study time.</p>
     </div>
 
     @if (!Session.IsLoggedIn)
     {
         <div class="notice">
-            You must
-            <a href="login">sign in</a>
-            before viewing progress.
+            You must <a href="login">sign in</a> before viewing progress.
         </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="empty-state">Loading progress...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="error-message">@_errorMessage</div>
     }
     else
     {
-        <div class="dashboard-grid">
-            <div class="stat-card">
-                <span class="stat-number">
-                    0
-                </span>
+        <div class="progress-metric-grid">
+            <article class="progress-metric-card">
+                <span>Total Sessions</span>
+                <strong>@TotalSessions</strong>
+            </article>
 
-                <span>
-                    Completed Sessions
-                </span>
+            <article class="progress-metric-card">
+                <span>Completed</span>
+                <strong>@CompletedSessions</strong>
+            </article>
+
+            <article class="progress-metric-card">
+                <span>Remaining</span>
+                <strong>@RemainingSessions</strong>
+            </article>
+
+            <article class="progress-metric-card">
+                <span>Study Minutes Completed</span>
+                <strong>@CompletedMinutes</strong>
+            </article>
+        </div>
+
+        <div class="progress-summary-card">
+            <div class="results-heading">
+                <div>
+                    <h2>Completion Rate</h2>
+                    <p class="result-count">@CompletionPercent% of planned sessions completed</p>
+                </div>
+                <strong class="progress-percentage">@CompletionPercent%</strong>
             </div>
 
-            <div class="stat-card">
-                <span class="stat-number">
-                    0
-                </span>
-
-                <span>
-                    Remaining Sessions
-                </span>
-            </div>
-
-            <div class="stat-card">
-                <span class="stat-number">
-                    0%
-                </span>
-
-                <span>
-                    Completion Rate
-                </span>
+            <div class="progress-track" aria-label="Completion progress">
+                <div class="progress-fill" style="@($"width: {CompletionPercent}%")"></div>
             </div>
         </div>
 
-        <p class="phase-note">
-            Live progress calculations will be
-            implemented when study-session
-            management is completed.
-        </p>
+        <div class="section-divider"></div>
+
+        <div class="results-heading">
+            <div>
+                <h2>Recent Sessions</h2>
+                <p class="result-count">Latest study activity</p>
+            </div>
+
+            <button type="button"
+                    class="secondary-button"
+                    disabled="@_isLoading"
+                    @onclick="LoadProgress">
+                Refresh
+            </button>
+        </div>
+
+        @if (_sessions.Count == 0)
+        {
+            <div class="empty-state">
+                Add study sessions to begin tracking progress.
+            </div>
+        }
+        else
+        {
+            <div class="recent-session-list">
+                @foreach (var studySession in _sessions.Take(8))
+                {
+                    <div class="recent-session-row">
+                        <div>
+                            <strong>@studySession.Goal</strong>
+                            <span>@studySession.SessionDate.ToString("MMM d, yyyy") • @studySession.DurationMinutes min</span>
+                        </div>
+
+                        <span class="session-status @(studySession.Completed ? "status-complete" : "status-planned")">
+                            @(studySession.Completed ? "Completed" : "Planned")
+                        </span>
+                    </div>
+                }
+            </div>
+        }
     }
 </section>
+
+@code {
+    private readonly List<StudySessionItem> _sessions = new();
+    private bool _isLoading;
+    private string _errorMessage = string.Empty;
+
+    private int TotalSessions => _sessions.Count;
+    private int CompletedSessions => _sessions.Count(session => session.Completed);
+    private int RemainingSessions => TotalSessions - CompletedSessions;
+    private int CompletedMinutes => _sessions
+        .Where(session => session.Completed)
+        .Sum(session => session.DurationMinutes);
+
+    private int CompletionPercent => TotalSessions == 0
+        ? 0
+        : (int)Math.Round((double)CompletedSessions / TotalSessions * 100);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.IsLoggedIn)
+        {
+            await LoadProgress();
+        }
+    }
+
+    /// <summary>
+    /// Reloads the user's session records and recalculates the
+    /// summary metrics displayed by this page.
+    /// </summary>
+    private async Task LoadProgress()
+    {
+        _isLoading = true;
+        _errorMessage = string.Empty;
+
+        try
+        {
+            var sessions = await Supabase.GetStudySessionsAsync(
+                Session.AccessToken!);
+
+            _sessions.Clear();
+            _sessions.AddRange(sessions);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Progress load error: {ex}");
+            _errorMessage = "Progress information could not be loaded.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

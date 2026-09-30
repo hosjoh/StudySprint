@@ -603,6 +603,141 @@ public sealed class SupabaseService
         [JsonPropertyName("email")]
         public string? Email { get; set; }
     }
+    /// <summary>
+    /// Returns all study sessions that the current user's RLS policy allows.
+    /// </summary>
+    public async Task<List<StudySessionItem>> GetStudySessionsAsync(
+        string accessToken)
+    {
+        using var request = CreateAuthorizedRequest(
+            HttpMethod.Get,
+            $"{_supabaseUrl}/rest/v1/study_sessions" +
+            "?select=id,user_id,subject_id,goal,session_date,duration_minutes,completed,created_at" +
+            "&order=session_date.desc,created_at.desc",
+            accessToken);
+
+        using var response = await _httpClient.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                "Study sessions could not be loaded.");
+        }
+
+        var sessions = await response.Content
+            .ReadFromJsonAsync<List<StudySessionItem>>(JsonOptions);
+
+        return sessions ?? new List<StudySessionItem>();
+    }
+
+    /// <summary>
+    /// Adds a study session belonging to the authenticated user.
+    /// </summary>
+    public async Task AddStudySessionAsync(
+        string userId,
+        Guid? subjectId,
+        string goal,
+        DateTime sessionDate,
+        int durationMinutes,
+        string accessToken)
+    {
+        using var request = CreateAuthorizedRequest(
+            HttpMethod.Post,
+            $"{_supabaseUrl}/rest/v1/study_sessions",
+            accessToken);
+
+        request.Headers.TryAddWithoutValidation(
+            "Prefer",
+            "return=minimal");
+
+        request.Content = JsonContent.Create(new
+        {
+            user_id = userId,
+            subject_id = subjectId,
+            goal,
+            session_date = sessionDate.ToString("yyyy-MM-dd"),
+            duration_minutes = durationMinutes,
+            completed = false
+        });
+
+        using var response = await _httpClient.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await GetErrorMessageAsync(
+                response,
+                "The study session could not be saved.");
+
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    /// <summary>
+    /// Updates an existing study session. RLS restricts the update to
+    /// a session owned by the signed-in user.
+    /// </summary>
+    public async Task UpdateStudySessionAsync(
+        Guid sessionId,
+        Guid? subjectId,
+        string goal,
+        DateTime sessionDate,
+        int durationMinutes,
+        bool completed,
+        string accessToken)
+    {
+        using var request = CreateAuthorizedRequest(
+            HttpMethod.Patch,
+            $"{_supabaseUrl}/rest/v1/study_sessions?id=eq.{sessionId}",
+            accessToken);
+
+        request.Headers.TryAddWithoutValidation(
+            "Prefer",
+            "return=minimal");
+
+        request.Content = JsonContent.Create(new
+        {
+            subject_id = subjectId,
+            goal,
+            session_date = sessionDate.ToString("yyyy-MM-dd"),
+            duration_minutes = durationMinutes,
+            completed
+        });
+
+        using var response = await _httpClient.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await GetErrorMessageAsync(
+                response,
+                "The study session could not be updated.");
+
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    /// <summary>
+    /// Deletes one study session owned by the authenticated user.
+    /// </summary>
+    public async Task DeleteStudySessionAsync(
+        Guid sessionId,
+        string accessToken)
+    {
+        using var request = CreateAuthorizedRequest(
+            HttpMethod.Delete,
+            $"{_supabaseUrl}/rest/v1/study_sessions?id=eq.{sessionId}",
+            accessToken);
+
+        using var response = await _httpClient.SendAsync(request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await GetErrorMessageAsync(
+                response,
+                "The study session could not be deleted.");
+
+            throw new InvalidOperationException(message);
+        }
+    }
 }
 
 public sealed record LoginResult(
